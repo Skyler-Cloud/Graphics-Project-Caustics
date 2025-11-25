@@ -10,16 +10,22 @@ class Material {
       : ambient_color_(0.0f),
         diffuse_color_(0.0f),
         specular_color_(0.0f),
-        shininess_(0.0f) {
+        shininess_(0.0f),
+        transparent_(false),
+        index_of_refraction_(1.0f) {
   }
   Material(const glm::vec3& ambient_color,
            const glm::vec3& diffuse_color,
            const glm::vec3& specular_color,
-           float shininess)
+           float shininess,
+           bool transparent = false,
+           float index_of_refraction = 1.0f)
       : ambient_color_(ambient_color),
         diffuse_color_(diffuse_color),
         specular_color_(specular_color),
-        shininess_(shininess) {
+        shininess_(shininess),
+        transparent_(transparent),
+        index_of_refraction_(index_of_refraction) {
   }
 
   static const Material& GetDefault() {
@@ -61,11 +67,29 @@ class Material {
     shininess_ = shininess;
   }
 
+  bool IsTransparent() const {
+    return transparent_;
+  }
+
+  void SetTransparent(bool transparent) {
+    transparent_ = transparent;
+  }
+
+  float GetIndexOfRefraction() const {
+    return index_of_refraction_;
+  }
+
+  void SetIndexOfRefraction(float index_of_refraction) {
+    index_of_refraction_ = index_of_refraction;
+  }
+
  private:
   glm::vec3 ambient_color_;
   glm::vec3 diffuse_color_;
   glm::vec3 specular_color_;
   float shininess_;
+  bool transparent_;
+  float index_of_refraction_;
 };
 }  // namespace GLOO
 

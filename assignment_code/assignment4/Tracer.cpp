@@ -106,6 +106,46 @@ glm::vec3 Tracer::TraceRay(const Ray& ray,
     return GetBackgroundColor(ray.GetDirection()) * (1.0f-fog_opacity_) + fog_opacity_*fog_color_;
   }
 
+  if (hit_material.IsTransparent()) {
+    // For transparent materials, we simply continue tracing the ray
+    // without any shading at the intersection point.
+    glm::vec3 normal = record.normal;
+    float ior = hit_material.GetIndexOfRefraction();
+    float cosi = glm::clamp(glm::dot(ray.GetDirection(), normal), -1.0f, 1.0f);
+    float etai = 1.0f, etat = ior;
+    if (cosi < 0) {
+      cosi = -cosi;
+    } else {
+      std::swap(etai, etat);
+      normal = -normal;
+    }
+    float eta = etai / etat;
+    float k = 1 - eta * eta * (1 - cosi * cosi);
+    glm::vec3 direction;
+      if (k < 0) {
+        // Total internal reflection: trace reflected ray
+        glm::vec3 reflect_dir = glm::reflect(ray.GetDirection(), normal);
+        reflect_dir = glm::normalize(reflect_dir);
+        Ray reflected_ray(ray.At(record.time), reflect_dir);
+        HitRecord reflect_record;
+        glm::vec3 result = TraceRay(reflected_ray, bounces, reflect_record);
+        if (reflect_record.time == std::numeric_limits<float>::max()) {
+          return GetBackgroundColor(reflect_dir);
+        }
+        return result;
+      } else {
+        direction = eta * ray.GetDirection() + (eta * cosi - glm::sqrt(k)) * normal;
+        direction = glm::normalize(direction);
+        Ray transmitted_ray(ray.At(record.time), direction);
+        HitRecord transmit_record;
+        glm::vec3 result = TraceRay(transmitted_ray, bounces, transmit_record);
+        if (transmit_record.time == std::numeric_limits<float>::max()) {
+          return GetBackgroundColor(direction);
+        }
+        return result;
+      }
+  }
+
   glm::vec3 diffuse_color = hit_material.GetDiffuseColor();
   glm::vec3 specular_color = hit_material.GetSpecularColor();
   float shininess = hit_material.GetShininess();

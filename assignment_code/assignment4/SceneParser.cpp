@@ -149,6 +149,10 @@ std::shared_ptr<Material> SceneParser::ParseMaterial() {
       material->SetSpecularColor(color);
     } else if (token == "shininess") {
       material->SetShininess(ReadFloat());
+    } else if (token == "transparent") {
+      material->SetTransparent(true);
+    } else if (token == "index_of_refraction") {
+      material->SetIndexOfRefraction(ReadFloat());
     } else if (token != "}") {
       throw std::runtime_error("Bad material token " + token + "!");
     }
