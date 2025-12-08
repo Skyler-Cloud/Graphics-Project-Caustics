@@ -24,6 +24,9 @@ class ArgParser {
   bool jitter;
   bool filter;
 
+  // caustics toggle
+  bool enable_caustics;
+
  private:
   void SetDefaultValues();
 };

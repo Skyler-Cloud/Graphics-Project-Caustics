@@ -36,6 +36,8 @@ ArgParser::ArgParser(int argc, const char* argv[]) {
       jitter = true;
     } else if (!strcmp(argv[i], "-filter")) {
       filter = true;
+    } else if (!strcmp(argv[i], "-caustics")) {
+      enable_caustics = true;
     } else {
       printf("Unknown command line argument %d: '%s'\n", i, argv[i]);
       exit(1);
@@ -62,4 +64,5 @@ void ArgParser::SetDefaultValues() {
   shadows = false;
   jitter = false;
   filter = false;
+  enable_caustics = false;
 }
