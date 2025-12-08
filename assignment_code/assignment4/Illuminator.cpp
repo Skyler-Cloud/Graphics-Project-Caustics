@@ -34,7 +34,7 @@ void Illuminator::GetIllumination(const LightComponent& light_component,
     float attenuation = point_light_ptr->GetAttenuation()[2]; // only use quadratic attenuation
       // See (const/linear/quadratic attenuation): https://developer.valvesoftware.com/wiki/Constant-Linear-Quadratic_Falloff
     intensity = color / (attenuation * dist_to_light*dist_to_light);
-  } else {  // TODO: Implement point light.
+  } else {
     throw std::runtime_error(
         "Unrecognized light type when computing "
         "illumination");

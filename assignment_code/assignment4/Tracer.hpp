@@ -11,6 +11,7 @@
 #include "TracingComponent.hpp"
 #include "CubeMap.hpp"
 #include "PerspectiveCamera.hpp"
+#include "PhotonMap.hpp"
 
 namespace GLOO {
 class Tracer {
@@ -25,7 +26,9 @@ class Tracer {
          bool filter,
          glm::vec3 fog_color = glm::vec3(0.0f),
          float fog_density = 0.0f,
-         float fog_opacity = 0.5f)
+         float fog_opacity = 0.5f,
+         int num_photons = 100000,
+         bool enable_caustics = true)
       : camera_(camera_spec),
         image_size_(image_size),
         max_bounces_(max_bounces),
@@ -37,6 +40,8 @@ class Tracer {
         fog_color_(fog_color),
         fog_density_(fog_density),
         fog_opacity_(fog_opacity),
+        num_photons_(num_photons),
+        enable_caustics_(enable_caustics),
         scene_ptr_(nullptr) {
   }
   void Render(const Scene& scene, const std::string& output_file);
@@ -45,6 +50,9 @@ class Tracer {
   glm::vec3 TraceRay(const Ray& ray, size_t bounces, HitRecord& record) const;
 
   glm::vec3 GetBackgroundColor(const glm::vec3& direction) const;
+
+  glm::vec3 ComputeCaustics(const glm::vec3& hit_point, const glm::vec3& normal, int k = 50) const;
+  float CausticsKernel(float distance, float radius) const;
 
   PerspectiveCamera camera_;
   glm::ivec2 image_size_;
@@ -62,6 +70,10 @@ class Tracer {
 
   bool jitter_enabled_;
   bool filter_enabled_;
+
+  int num_photons_;
+  bool enable_caustics_;
+  mutable PhotonMap photon_map_;
 
   const Scene* scene_ptr_;
 };

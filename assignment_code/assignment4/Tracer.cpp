@@ -20,6 +20,11 @@ void Tracer::Render(const Scene& scene, const std::string& output_file) {
   tracing_components_ = root.GetComponentPtrsInChildren<TracingComponent>();
   light_components_ = root.GetComponentPtrsInChildren<LightComponent>();
 
+  // Build photon map for caustics if enabled
+  if (enable_caustics_) {
+    photon_map_.BuildPhotonMap(scene, num_photons_);
+  }
+
   std::default_random_engine generator;
   generator.seed(time(0));
   std::uniform_real_distribution<float> distribution(-1.0f,1.0f);
@@ -201,6 +206,12 @@ glm::vec3 Tracer::TraceRay(const Ray& ray,
     color += glm::pow(glm::max(0.0f, glm::dot(reflect_dir, dir_to_light)), shininess) * light_intensity * specular_color;
   }
 
+  // Add caustics contribution if enabled
+  if (enable_caustics_) {
+    glm::vec3 caustics = ComputeCaustics(hit_point, record.normal);
+    color += caustics;
+  }
+
   // recurse if needed
   if (bounces > 0) {
     HitRecord reflect_record;
@@ -225,4 +236,43 @@ glm::vec3 Tracer::GetBackgroundColor(const glm::vec3& direction) const {
   } else
     return background_color_;
 }
+
+glm::vec3 Tracer::ComputeCaustics(const glm::vec3& hit_point, const glm::vec3& normal, int k) const {
+  float max_dist2;
+  std::vector<int> photon_indices = photon_map_.queryKNearestPhotons(hit_point, k, max_dist2);
+
+  if (photon_indices.empty()) return glm::vec3(0.0f);
+
+  glm::vec3 caustics_contribution(0.0f);
+
+  for (int idx : photon_indices) {
+    const Photon& photon = photon_map_.getIthPhoton(idx);
+
+    // Cone filter kernel based on distance
+    float dist2 = glm::distance(hit_point, photon.position);
+    dist2 = dist2 * dist2;
+    float weight = glm::max(0.0f, 1.0f - dist2 / max_dist2); // cone filter
+
+    // Apply cosine term: photon's incident direction vs surface normal
+    float cosine_factor = glm::max(0.0f, glm::dot(normal, -photon.wi));
+
+    caustics_contribution += photon.throughput * weight * cosine_factor;
+  }
+
+  // Normalize by search area (approximated as disk of radius sqrt(max_dist2))
+  float search_radius = glm::sqrt(max_dist2);
+  float search_area = 3.14159f * search_radius * search_radius;
+  if (search_area > 0.001f) {
+    caustics_contribution /= search_area;
+  }
+
+  return caustics_contribution;
+}
+
+float Tracer::CausticsKernel(float distance, float radius) const {
+  // Cone filter kernel: linear falloff with distance
+  if (distance >= radius) return 0.0f;
+  return (radius - distance) / radius;
+}
+
 }  // namespace GLOO
