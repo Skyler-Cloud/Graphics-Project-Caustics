@@ -27,7 +27,7 @@ class Tracer {
          glm::vec3 fog_color = glm::vec3(0.0f),
          float fog_density = 0.0f,
          float fog_opacity = 0.5f,
-         int num_photons = 10000000,
+         int num_photons = 100000,
          bool enable_caustics = true)
       : camera_(camera_spec),
         image_size_(image_size),
