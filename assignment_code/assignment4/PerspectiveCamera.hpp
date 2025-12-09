@@ -33,6 +33,21 @@ class PerspectiveCamera {
     return 0.0f;
   }
 
+  glm::mat4 GetViewMatrix() const {
+    // Camera looks from center_ in direction_ with up_ as the up vector
+    return glm::lookAt(center_, center_ + direction_, up_);
+  }
+
+  glm::mat4 GetProjectionMatrix(float aspect = 1.0f, float near = 0.1f, float far = 1000.0f) const {
+    // Perspective projection
+    float fovy = fov_radian_;
+    return glm::perspective(fovy, aspect, near, far);
+  }
+
+  glm::mat4 GetViewProjectionMatrix(float aspect = 1.0f, float near = 0.1f, float far = 1000.0f) const {
+    return GetProjectionMatrix(aspect, near, far) * GetViewMatrix();
+  }
+
  private:
   glm::vec3 center_;
   glm::vec3 direction_;

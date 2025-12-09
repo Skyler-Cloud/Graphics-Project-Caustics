@@ -20,7 +20,8 @@ int main(int argc, const char* argv[]) {
                 glm::ivec2(arg_parser.width, arg_parser.height),
                 arg_parser.bounces, scene_parser.GetBackgroundColor(),
                 scene_parser.GetCubeMapPtr(), arg_parser.shadows, arg_parser.jitter, arg_parser.filter,
-                scene_parser.GetFogColor(), scene_parser.GetFogDensity(), scene_parser.GetFogOpacity());
+                scene_parser.GetFogColor(), scene_parser.GetFogDensity(), scene_parser.GetFogOpacity(),
+                /* num_photons */ 100000, arg_parser.enable_caustics);
   tracer.Render(*scene, arg_parser.output_file);
   return 0;
 }

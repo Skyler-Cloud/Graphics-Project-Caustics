@@ -20,6 +20,17 @@ void Tracer::Render(const Scene& scene, const std::string& output_file) {
   tracing_components_ = root.GetComponentPtrsInChildren<TracingComponent>();
   light_components_ = root.GetComponentPtrsInChildren<LightComponent>();
 
+  // Build photon map for caustics if enabled
+  if (enable_caustics_) {
+    std::cout << "[Photon Mapping] Building photon map with "
+              << num_photons_ << " photons..." << std::endl;
+    photon_map_.BuildPhotonMap(scene, num_photons_);
+    std::cout << "[Photon Mapping] Number of photons stored: " << photon_map_.getNPhotons() << std::endl;
+  }
+  else {
+    std::cout << "[Photon Mapping] Caustics disabled." << std::endl;
+  }
+
   std::default_random_engine generator;
   generator.seed(time(0));
   std::uniform_real_distribution<float> distribution(-1.0f,1.0f);
@@ -62,6 +73,20 @@ void Tracer::Render(const Scene& scene, const std::string& output_file) {
       image.SetPixel(x, y, color/total_weight);
     }
   }
+
+  // glm::mat4 view_proj = camera_.GetProjectionMatrix() * camera_.GetViewMatrix();
+  // std::cout << "[Photon Mapping] Visualizing photons on image..." << std::endl;
+  // for (const Photon& photon : photon_map_.getPhotons()) {
+  //     glm::vec4 clip = view_proj * glm::vec4(photon.position, 1.0f);
+  //     if (clip.w == 0.0f) continue;
+  //     glm::vec3 ndc = glm::vec3(clip) / clip.w; // normalized device coordinates
+  //     int px = static_cast<int>((ndc.x * 0.5f + 0.5f) * image_size_.x);
+  //     int py = static_cast<int>((1.0f - (ndc.y * 0.5f + 0.5f)) * image_size_.y); // flip y
+
+  //     if (px >= 0 && px < image_size_.x && py >= 0 && py < image_size_.y && photon.position.y  == 0.0f) {
+  //         image.SetPixel(px, py, glm::vec3(0, 0, 1)); // Blue dot for photon
+  //     }
+  // }
 
   if (output_file.size())
     image.SavePNG(output_file);
@@ -184,45 +209,4 @@ glm::vec3 Tracer::TraceRay(const Ray& ray,
           glm::vec4 local_hit = glm::vec4(shadow_ray.At(shadow_record.time), 1.0f);
           glm::vec3 world_hit = glm::vec3(transform * local_hit);
           float shadow_distance = glm::length(world_hit - hit_point);
-          if (shadow_distance < dist_to_light) {
-            in_shadow = true; // if in shadow, skip this light
-            break;
-          }
-        }
-      }
-      if (in_shadow)
-        continue; // skip to next light
-    }
-
-    // Diffuse component:
-    color += glm::max(0.0f, glm::dot(dir_to_light, record.normal)) * light_intensity * diffuse_color;
-
-    // Specular component:
-    color += glm::pow(glm::max(0.0f, glm::dot(reflect_dir, dir_to_light)), shininess) * light_intensity * specular_color;
-  }
-
-  // recurse if needed
-  if (bounces > 0) {
-    HitRecord reflect_record;
-    glm::vec3 reflected_color = TraceRay(Ray(hit_point, reflect_dir), bounces - 1, reflect_record);
-    color += reflected_color * specular_color;
-  }
-
-  // calculate fog effect from camera to hit point
-  if (fog_density_ > 0.0f) {
-    float unfogged_amount = glm::max(1-fog_opacity_, glm::exp(-fog_density_ * glm::length(ray.GetOrigin() - hit_point)));
-    color = unfogged_amount * color + (1-unfogged_amount) * fog_color_;
-  }
-
-  return color;
-}
-
-
-
-glm::vec3 Tracer::GetBackgroundColor(const glm::vec3& direction) const {
-  if (cube_map_ != nullptr) {
-    return cube_map_->GetTexel(direction);
-  } else
-    return background_color_;
-}
-}  // namespace GLOO
+       
