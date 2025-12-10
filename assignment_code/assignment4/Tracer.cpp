@@ -22,7 +22,13 @@ void Tracer::Render(const Scene& scene, const std::string& output_file) {
 
   // Build photon map for caustics if enabled
   if (enable_caustics_) {
+    std::cout << "[Photon Mapping] Building photon map with "
+              << num_photons_ << " photons..." << std::endl;
     photon_map_.BuildPhotonMap(scene, num_photons_);
+    std::cout << "[Photon Mapping] Number of photons stored: " << photon_map_.getNPhotons() << std::endl;
+  }
+  else {
+    std::cout << "[Photon Mapping] Caustics disabled." << std::endl;
   }
 
   std::default_random_engine generator;
@@ -67,6 +73,25 @@ void Tracer::Render(const Scene& scene, const std::string& output_file) {
       image.SetPixel(x, y, color/total_weight);
     }
   }
+
+  // glm::mat4 view_proj = camera_.GetProjectionMatrix() * camera_.GetViewMatrix();
+  // std::cout << "[Photon Mapping] Visualizing photons on image..." << std::endl;
+  // for (const Photon& photon : photon_map_.getPhotons()) {
+  //     glm::vec4 clip = view_proj * glm::vec4(photon.position, 1.0f);
+  //     if (clip.w == 0.0f) continue;
+  //     glm::vec3 ndc = glm::vec3(clip) / clip.w; // normalized device coordinates
+  //     int px = static_cast<int>((ndc.x * 0.5f + 0.5f) * image_size_.x);
+  //     int py = static_cast<int>((1.0f - (ndc.y * 0.5f + 0.5f)) * image_size_.y); // flip y
+
+  //     if (px >= 0 && px < image_size_.x && py >= 0 && py < image_size_.y) {
+  //         if (photon.position.y == 0.f) {std::cout << "visualizing photon on floor" << std::endl;
+  //         image.SetPixel(px, py, glm::vec3(1, 1, 0)); // yellow dot for photon}
+  //         }
+  //         else {std::cout << "visualizing photon" << std::endl;
+  //         image.SetPixel(px, py, glm::vec3(1, 0, 1)); // magenta dot for photon}
+  //         }
+  //     }
+  // }
 
   if (output_file.size())
     image.SavePNG(output_file);
@@ -209,7 +234,7 @@ glm::vec3 Tracer::TraceRay(const Ray& ray,
   // Add caustics contribution if enabled
   if (enable_caustics_) {
     glm::vec3 caustics = ComputeCaustics(hit_point, record.normal);
-    color += caustics;
+    color += 100.f*caustics * diffuse_color; // scale caustics effect
   }
 
   // recurse if needed

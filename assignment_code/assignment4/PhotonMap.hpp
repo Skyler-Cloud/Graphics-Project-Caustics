@@ -42,6 +42,7 @@ private:
 
         glm::vec3 photon_pos, photon_dir, photon_power;
 
+
         if (light_ptr->GetType() == LightType::Point) {
           auto point_light = static_cast<PointLight*>(light_ptr);
           photon_pos = light_component->GetNodePtr()->GetTransform().GetWorldPosition();
@@ -57,32 +58,34 @@ private:
             sinTheta * glm::sin(phi)
           ));
         } else if (light_ptr->GetType() == LightType::Directional) {
+          // std::cout << "Emitting photons from directional light" << std::endl;
           auto directional_light = static_cast<DirectionalLight*>(light_ptr);
-          glm::vec3 light_dir = glm::normalize(-directional_light->GetDirection());
-          photon_pos = glm::vec3(1000.0f) - light_dir * 1000.0f;
-          photon_power = directional_light->GetDiffuseColor() / static_cast<float>(num_photons);
+          glm::vec3 light_dir = glm::normalize(directional_light->GetDirection());
+          photon_power = directional_light->GetDiffuseColor() / static_cast<float>(num_photons) * 20.f;
 
-          // Cone sampling (10-degree cone)
-          float max_angle = glm::radians(10.0f);
-          float cos_alpha = glm::cos(max_angle);
-          float r1 = uniform_dist(rng);
-          float cosTheta = 1.0f - r1 * (1.0f - cos_alpha);
-          float sinTheta = glm::sqrt(glm::max(0.0f, 1.0f - cosTheta * cosTheta));
-          float phi = angle_dist(rng);
+          // --- Emit from a plane covering the scene ---
 
-          glm::vec3 local_dir = glm::vec3(
-            sinTheta * glm::cos(phi),
-            cosTheta,
-            sinTheta * glm::sin(phi)
-          );
+          // Hardcoded scene bounds (adjust as needed for your scenes)
+          glm::vec3 min_bound(0.0f, 0.0f, -2.0f);
+          glm::vec3 max_bound(8.0f, 6.0f, 6.0f);
+          glm::vec3 center = 0.5f * (min_bound + max_bound);
+          glm::vec3 extent = max_bound - min_bound;
+          float plane_size = glm::max(extent.x, extent.z) * 1.5f + 1.0f;
 
-          // Build basis
+          // Build orthonormal basis for the plane
           glm::vec3 axis = light_dir;
           glm::vec3 tmp = (glm::abs(axis.y) < 0.999f) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
           glm::vec3 right = glm::normalize(glm::cross(tmp, axis));
-          glm::vec3 up = glm::cross(axis, right);
+          glm::vec3 up = glm::normalize(glm::cross(axis, right));
 
-          photon_dir = glm::normalize(local_dir.x * right + local_dir.y * axis + local_dir.z * up);
+          // Random point on the plane
+          float u = uniform_dist(rng) - 0.5f;
+          float v = uniform_dist(rng) - 0.5f;
+          glm::vec3 plane_center = center + light_dir * (0.5f * extent.y + 2.0f); // offset above scene
+          photon_pos = plane_center + u * plane_size * right + v * plane_size * up;
+
+          // Emit all photons in exactly the light direction (no cone)
+          photon_dir = light_dir;
         } else {
           continue;
         }
@@ -95,9 +98,9 @@ private:
 
   }
 
-  void TracePhoton(const Scene& scene, const std::vector<TracingComponent*>& tracing_components,
-                    glm::vec3 position, glm::vec3 direction, glm::vec3 power, int depth) {
-    // Stop after a few bounces but keep even low-power photons so the map isn’t empty.
+void TracePhoton(const Scene& scene, const std::vector<TracingComponent*>& tracing_components,
+                glm::vec3 position, glm::vec3 direction, glm::vec3 power, int depth, bool has_refracted = false) {
+                      // Stop after a few bounces but keep even low-power photons so the map isn’t empty.
     if (depth > 5) return;
 
     Ray ray(position, direction);
@@ -115,12 +118,12 @@ private:
       local_ray.ApplyTransform(inverse_transform);
 
       HitRecord local_record;
-      if (p->GetHittable().Intersect(local_ray, 0.001f, local_record)) {
+      if (p->GetHittable().Intersect(local_ray, 0.00001f, local_record)) {
         glm::vec4 local_hit = glm::vec4(local_ray.At(local_record.time), 1.0f);
         glm::vec3 world_hit = glm::vec3(transform * local_hit);
         float world_t = glm::length(world_hit - ray.GetOrigin());
 
-        if (world_t < record.time && world_t >= 0.001f) {
+        if (world_t < record.time && world_t >= 0.00001f) {
           record.time = world_t;
           record.normal = glm::normalize(glm::transpose(glm::mat3(inverse_transform)) * local_record.normal);
           auto material_component = p->GetNodePtr()->GetComponentPtr<MaterialComponent>();
@@ -135,9 +138,10 @@ private:
     glm::vec3 hit_point = ray.At(record.time);
 
     // Store photon at diffuse surfaces
-    if (glm::length(hit_material.GetSpecularColor()) < 0.1f) {
+    if (glm::length(hit_material.GetSpecularColor()) < 0.1f && !hit_material.IsTransparent() && has_refracted) {
+    // if (glm::length(hit_material.GetSpecularColor()) < 0.1f && !hit_material.IsTransparent()) {
       // Diffuse surface - store photon
-      photons.emplace_back(power, hit_point, -direction);
+      photons.emplace_back(power, hit_point, direction);
     }
 
     // Continue tracing for specular/refractive surfaces
@@ -145,7 +149,7 @@ private:
       // Reflection
       glm::vec3 reflect_dir = glm::reflect(direction, record.normal);
       glm::vec3 new_power = power * hit_material.GetSpecularColor();
-      TracePhoton(scene, tracing_components, hit_point + 0.001f * reflect_dir, reflect_dir, new_power, depth + 1);
+      TracePhoton(scene, tracing_components, hit_point + 0.00001f * reflect_dir, reflect_dir, new_power, depth + 1, has_refracted);
     }
 
     if (hit_material.IsTransparent()) {
@@ -165,7 +169,7 @@ private:
       if (k >= 0) {
         glm::vec3 refract_dir = eta * direction + (eta * cosi - glm::sqrt(k)) * normal;
         refract_dir = glm::normalize(refract_dir);
-        TracePhoton(scene, tracing_components, hit_point + 0.001f * refract_dir, refract_dir, power, depth + 1);
+        TracePhoton(scene, tracing_components, hit_point + 0.00001f * refract_dir, refract_dir, power, depth + 1, true);
       }
     }
   }
@@ -188,6 +192,10 @@ public:
 
   std::vector<int> queryKNearestPhotons(const glm::vec3& p, int k, float& max_dist2) const {
     return kdtree.searchKNearest(p, k, max_dist2);
+  }
+
+  std::vector<Photon> getPhotons() const {
+    return photons;
   }
 };
 
